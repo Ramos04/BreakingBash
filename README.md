@@ -1,2 +1,12 @@
 # BreakingBash
 Bash Script tips, tricks, functions, templates, best practices, etc. 
+
+### Resources
+[Linting](https://www.shellcheck.net/)
+[Strict-Mode](http://redsymbol.net/articles/unofficial-bash-strict-mode/)
+[Exit Traps](http://redsymbol.net/articles/bash-exit-traps/)
+[Template](https://www.uxora.com/unix/shell-script/18-shell-script-template)
+
+
+
+
