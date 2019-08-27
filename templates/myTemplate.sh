@@ -150,13 +150,6 @@ SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
   # +--------------------+
 fileLog="/dev/null"
 
-  # +----------------------+
-  # |-- option variables --|
-  # +----------------------+
-flagOptErr=0
-#Change this to reflect the number of options the program has
-flagOptTotal=0
-
   # +------------------------+
   # |-- function variables --|
   # +------------------------+
@@ -166,28 +159,66 @@ flagOptTotal=0
 #  PARSE OPTIONS WITH GETOPTS
 #============================
 
+  # +----------------------+
+  # |-- option variables --|
+  # +----------------------+
+flagOptErr=0
+#Change this to reflect the number of options the program has
+flagOptTotal=0
+flagOpts=":hv-:"
+
 #Need to fix this shit
 
-  #== parse options ==#
-while getopts ${SCRIPT_OPTS} OPTION ; do
-	#== manage options ==#
-	case "$OPTION" in
-		h ) usagefull
-			exit 0
+while getopts "$flagOpts" OPTION; do
+    case "${OPTION}" in
+        -)
+            case "${OPTARG}" in
+		help ) usagefull
+	            exit 0
 		;;
-		
-		v ) scriptinfo "ver"
-			exit 0
-		;;
-		
+
+		version ) scriptinfo "ver"
+	            exit 0
+		    ;;
+
 		: ) error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-			flagOptErr=1
-		;;
-		
+	            flagOptErr=1
+	        ;;
+
 		? ) error "${SCRIPT_NAME}: -$OPTARG: unknown option"
-			flagOptErr=1
-		;;
-	esac
+	            flagOptErr=1
+	        ;;
+
+                *)
+                    if [ "$OPTERR" = 1 ] && [ "${flagOpts:0:1}" != ":" ]; then
+                        echo "Unknown option --${OPTARG}" >&2
+                    fi
+                ;;
+            esac
+	;;
+
+	h ) usagefull
+	    exit 0
+	;;
+
+	v ) scriptinfo "ver"
+	    exit 0
+	;;
+
+	: ) error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
+	    flagOptErr=1
+	;;
+
+	? ) error "${SCRIPT_NAME}: -$OPTARG: unknown option"
+	    flagOptErr=1
+	;;
+
+        *)
+            if [ "$OPTERR" != 1 ] || [ "${flagOpts:0:1}" = ":" ]; then
+                echo "Non-option argument: '-${OPTARG}'" >&2
+            fi
+        ;;
+    esac
 done
 shift $((${OPTIND} - 1)) ## shift options
 
