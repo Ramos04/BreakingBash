@@ -3,10 +3,7 @@ Bash Script tips, tricks, functions, templates, best practices, etc.
 
 ## Resources
 
-1. Full fledged bash guide, anything from general usage to advanced
-
-[Bash Guide](http://mywiki.wooledge.org/BashGuide)
-
+1. Full fledged [Bash Guide](http://mywiki.wooledge.org/BashGuide) , anything from general usage to advanced
 2. Useful bash sytle guide relating to functions, loops, if's, etc..
 
 [Bash Style Guide](https://github.com/bahamas10/bash-style-guide)
