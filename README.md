@@ -9,8 +9,7 @@ Bash Script tips, tricks, functions, templates, best practices, etc.
 #!/bin/bash
 set -euo pipefail
 IFS=$'\n\t'
-```
-``` bash
+
 -e 		Immediately exit upon any non-zero exit code, just like c exits 
 		after a seg fault or syntax error in python
 -u 		Throws an error and immediately exits when you refernce a 
