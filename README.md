@@ -16,7 +16,8 @@ IFS=$'\n\t'
 -u 		Throws an error and immediately exits when you refernce a 
 		variable that is undefined
 -o pipefail	Prevents errors in a pipeline from being masked
-
+```
+``` bash
 IFS
 names=(
    "Aaron Maxwell"
