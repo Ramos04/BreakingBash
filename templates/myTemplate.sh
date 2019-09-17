@@ -6,28 +6,31 @@
 #+    ${SCRIPT_NAME} [-hv] [-o[file]] args ...
 #%
 #% DESCRIPTION
-#%    This is a script template
+#%    This script is used to set up a full blown elk stack with
 #%    to start any good shell script.
 #%
+#% INSTALLED
+#%    elasticsearch
+#%    logstash
+#%    kibana
+#%    nginx
+#%
 #% OPTIONS
-#%    -o [file], --output=[file]    Set log file (default=/dev/null)
-#%                                  use DEFAULT keyword to autoname file
-#%                                  The default value is /dev/null.
 #%    -h, --help                    Print this help
 #%    -v, --version                 Print script information
 #%
 #% EXAMPLES
-#%    ${SCRIPT_NAME} -o DEFAULT arg1 arg2
+#%    ${SCRIPT_NAME}
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 0.0.6
+#-    version         ${SCRIPT_NAME} 0.0.1
 #-    author          Vincent Ramos (https://github.com/Ramos04)
 #-    license         N/A
 #-
 #================================================================
 #  HISTORY
-#     2019/08/13 : Ramos04 : Template Creation
+#     2019/08/13 : Ramos04 : Created Template
 # 
 #================================================================
 #  DEBUG OPTION
@@ -37,7 +40,7 @@
 #================================================================
 # END_OF_HEADER
 #================================================================
-  
+
   # +---------------------+
   # |-- Script Breakers --|
   # +---------------------+
@@ -50,31 +53,6 @@ IFS=$'\n\t'
 #  FUNCTIONS
 #============================
 
-  # +--------------------+
-  # |-- fecho function --|
-  # +--------------------+
-fecho() {
-	_Type=${1} ; shift ;
-	[[ ${SCRIPT_TIMELOG_FLAG:-0} -ne 0 ]] && printf "$( date ${SCRIPT_TIMELOG_FORMAT} ) "
-	printf "[${_Type%[A-Z][A-Z]}] ${*}\n"
-	if [[ "${_Type}" = CAT ]]; then
-		_Tag="[O]"
-		[[ "$1" == \[*\] ]] && _Tag="${_Tag} ${1}"
-		if [[ ${SCRIPT_TIMELOG_FLAG:-0} -eq 0 ]]; then
-			cat -un - | awk '$0="'"${_Tag}"' "$0; fflush();' ;
-		elif [[ "${GNU_AWK_FLAG}" ]]; then # fast - compatible linux
-			cat -un - | awk -v tformat="${SCRIPT_TIMELOG_FORMAT#+} " '$0=strftime(tformat)"'"${_Tag}"' "$0; fflush();' ;
-		elif [[ "${PERL_FLAG}" ]]; then # fast - if perl installed
-			cat -un - | perl -pne 'use POSIX qw(strftime); print strftime "'${SCRIPT_TIMELOG_FORMAT_PERL}' ' "${_Tag}"' ", gmtime();'
-		else # average speed but resource intensive- compatible unix/linux
-			cat -un - | while read LINE; do \
-				[[ ${OLDSECONDS:=$(( ${SECONDS}-1 ))} -lt ${SECONDS} ]] && OLDSECONDS=$(( ${SECONDS}+1 )) \
-				&& TSTAMP="$( date ${SCRIPT_TIMELOG_FORMAT} ) "; printf "${TSTAMP}${_Tag} ${LINE}\n"; \
-			done 
-		fi
-	fi
-}
-
   # +----------------------+
   # |-- custom functions --|
   # +----------------------+
@@ -85,16 +63,50 @@ fecho() {
 #  ALIAS AND FUNCTIONS
 #============================
 
+  # +--------------------+
+  # |-- script cleanup --|
+  # +--------------------+
+TEMP_FILES=( )
+cleanup() {
+    # Check if there are temp files, if so clean up
+    if [[ ${#TEMP_FILES[@]} > 0 ]]; then
+        rm -f "${TEMP_FILES[@]}"
+    fi
+}
+trap cleanup EXIT
+
+
   # +--------------------------------+
   # |-- error management functions --|
   # +--------------------------------+
-info() { fecho INF "${*}"; }
-warning() { [[ "${flagMainScriptStart}"  -eq 1 ]] && ipcf_save "WRN" "0" "${*}" ; fecho WRN "WARNING: ${*}" 1>&2 ; }
-error() { [[ "${flagMainScriptStart}" -eq 1 ]] && ipcf_save "ERR" "0" "${*}" ; fecho ERR "ERROR: ${*}" 1>&2 ; }
-debug() { [[ ${flagDbg} -ne 0 ]] && fecho DBG "DEBUG: ${*}" 1>&2; }
-tag() { [[ "x$1" == "x--eol" ]] && awk '$0=$0" ['$2']"; fflush();' || awk '$0="['$1'] "$0; fflush();' ; }
-infotitle() { _txt="-==# ${*} #==-"; _txt2="-==#$( echo " ${*} " | tr '[:print:]' '#' )#==-" ;
-	info "$_txt2"; info "$_txt"; info "$_txt2"; 
+
+sudocheck() {
+    # Check if script is run as root
+    if [ "$EUID" -ne 0 ]
+        then echo "Please run as root"
+        exit
+    fi
+}
+
+error() {
+    local ERR_MESSAGE="$1"
+    local ERR_TIMESTAMP="$(date)"
+    echo ""$ERR_TIMESTAMP" "$SCRIPT_NAME" [ERR]: "$ERR_MESSAGE"" 2>&1 \
+        | tee -a "$FILE_LOG"
+}
+
+warning() {
+    local WARN_MESSAGE="$1"
+    local WARN_TIMESTAMP="$(date)"
+    echo ""$WARN_TIMESTAMP" "$SCRIPT_NAME" [WARN]: "$WARN_MESSAGE"" 2>&1 \
+    | tee -a "$FILE_LOG"
+}
+
+success(){
+    local SUC_MESSAGE="$1"
+    local SUC_TIMESTAMP="$(date)"
+    echo ""$SUC_TIMESTAMP" "$SCRIPT_NAME" [SUC]: "$SUC_MESSAGE"" 2>&1 \
+    | tee -a "$FILE_LOG"
 }
 
   # +----------------------------------+
@@ -104,15 +116,24 @@ infotitle() { _txt="-==# ${*} #==-"; _txt2="-==#$( echo " ${*} " | tr '[:print:]
   # +---------------------+
   # |-- usage functions --|
   # +---------------------+
-usage() { printf "Usage: "; scriptinfo usg ; }
-usagefull() { scriptinfo ful ; }
+usage() {
+    printf "Usage: ";
+    scriptinfo usg ;
+}
+
+usagefull() {
+    scriptinfo ful;
+}
+
 scriptinfo() { headFilter="^#-";
     if [[ ! -z "$1" ]];then
-	  [[ "$1" = "usg" ]] && headFilter="^#+"
-	  [[ "$1" = "ful" ]] && headFilter="^#[%+]"
-	  [[ "$1" = "ver" ]] && headFilter="^#-"
+        [[ "$1" = "usg" ]] && headFilter="^#+"
+        [[ "$1" = "ful" ]] && headFilter="^#[%+]"
+        [[ "$1" = "ver" ]] && headFilter="^#-"
     fi
-	head -${SCRIPT_HEADSIZE:-99} ${0} | grep -e "${headFilter}" | sed -e "s/${headFilter}//g" -e "s/\${SCRIPT_NAME}/${SCRIPT_NAME}/g"; }
+    head -${SCRIPT_HEADSIZE:-99} ${0} | grep -e "${headFilter}" | \
+        sed -e "s/${headFilter}//g" -e "s/\${SCRIPT_NAME}/${SCRIPT_NAME}/g";
+}
 
 #============================
 #  FILES AND VARIABLES
@@ -122,21 +143,23 @@ scriptinfo() { headFilter="^#-";
   # |-- general variables --|
   # +-----------------------+
 SCRIPT_VERSION="0.0.1"
-SCRIPT_NAME="$(basename ${0})" 						# scriptname without path
-SCRIPT_DIR="$( cd $(dirname "$0") && pwd )" 		# Script Directory
-SCRIPT_ROOT="${SCRIPT_DIR%/*}"						# Add a /* depending on depth of the script folder in the root. 
-SCRIPT_TEMP_DIR=$SCRIPT_DIR"/tmp" 					# Where to create temp folder
-SCRIPT_TEMP_DIR=$SCRIPT_DIR"/<name>.tmp" 			# Need to insert filename in this one
-SCRIPT_FULLPATH="${SCRIPT_DIR}/${SCRIPT_NAME}"		# Full path of the script
-HOSTNAME="$(hostname)"								# Hostname
-FULL_COMMAND="${0} $*"								# Full command
+SCRIPT_NAME_EXT="$(basename ${0})"                  # scriptname without path
+SCRIPT_NAME="${SCRIPT_NAME_EXT%.*}"                # scriptname without .sh
+SCRIPT_DIR="$( cd $(dirname "$0") && pwd )"     # Script Directory
+SCRIPT_ROOT="${SCRIPT_DIR%/*}"	                # Add a /* depending on depth of
+                                                # the script folder in the root.
+SCRIPT_TEMP_DIR=$SCRIPT_DIR"/tmp"               # Where to create temp folder
+SCRIPT_TEMP_DIR=$SCRIPT_DIR"/<name>.tmp"        # Need to insert filename in this one
+SCRIPT_FULLPATH="${SCRIPT_DIR}/${SCRIPT_NAME}"  # Full path of the script
+HOSTNAME="$(hostname)"                          # Hostname
+FULL_COMMAND="${0} $*"                          # Full command
 
   # +--------------------+
   # |-- date variables --|
   # +--------------------+
-SCRIPT_DATE_FORMAT="+%Y%m%d"
-SCRIPT_EXEC_DATE=$(date ${SCRIPT_DATE_FORMAT})
-SCRIPT_LOG_TIMESTAMP="$(date)"
+DATE_FORMAT="+%Y%m%d"
+DATE_SCRIPT_EXEC=$(date ${DATE_FORMAT})
+DATE_LOG_TIMESTAMP="$(date)"
 
   # +---------------------------+
   # |-- information variables --|
@@ -148,7 +171,24 @@ SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
   # +--------------------+
   # |-- file variables --|
   # +--------------------+
-fileLog="/dev/null"
+FILE_LOG="$(pwd)/"$SCRIPT_NAME".log"
+ERR_LOG="$(pwd)/error.log"
+
+  # +------------------+
+  # |-- color output --|
+  # +------------------+
+# color output
+COL_NORM=$'\e[0m'
+COL_RED=$'\e[0;31m'
+COL_GREEN=$'\e[0;32m'
+COL_BLUE=$'\e[0;34m'
+COL_BLACK=$'\e[0;30m'
+
+# bold
+COL_BOLD_RED=$'\e[1;31m'
+COL_BOLD_GREEN=$'\e[1;32m'
+COL_BOLD_BLUE=$'\e[1;34m'
+COL_BOLD_BLACK=$'\e[1;30m'
 
   # +------------------------+
   # |-- function variables --|
@@ -162,14 +202,15 @@ fileLog="/dev/null"
   # +----------------------+
   # |-- option variables --|
   # +----------------------+
-flagOptErr=0
-#Change this to reflect the number of options the program has
-flagOptTotal=0
-flagOpts=":hv-:"
+FLAG_OPT_ERR=0
+# Change this to reflect the number of options the program has
+FLAG_OPT_TOTAL=0
+# FLAG_ options
+FLAG_OPTS=":hv-:"
 
 #Need to fix this shit
 
-while getopts "$flagOpts" OPTION; do
+while getopts "$FLAG_OPTS" OPTION; do
     case "${OPTION}" in
         -)
             case "${OPTARG}" in
@@ -180,7 +221,7 @@ while getopts "$flagOpts" OPTION; do
 	    		   exit 0
                 ;;
                 *)  error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-	    	    flagOptErr=1
+	    	    FLAG_OPT_ERR=1
                 ;;
             esac
 	    ;;
@@ -194,15 +235,15 @@ while getopts "$flagOpts" OPTION; do
 	;;
 
 	: ) error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-	    flagOptErr=1
+	    FLAG_OPT_ERR=1
 	;;
 
 	? ) error "${SCRIPT_NAME}: -$OPTARG: unknown option"
-	    flagOptErr=1
+	    FLAG_OPT_ERR=1
 	;;
 
         *)  error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-            flagOptErr=1
+            FLAG_OPT_ERR=1
         ;;
     esac
 done
@@ -214,21 +255,17 @@ shift $((${OPTIND} - 1)) ## shift options
 #  MAIN SCRIPT
 #============================
 
-  #== Check for flag argument erros ==#
-[ $flagOptErr -eq 1 ] && exit 1 ## print usage if option error and exit
+  #== Check for FLAG_ argument erros ==#
+[ $FLAG_OPT_ERR -eq 1 ] && exit 1 ## print usage if option error and exit
 
   #== Check/Set arguments ==#
-[[ $# -gt "$flagOptTotal" ]] && error "${SCRIPT_NAME}: Too many arguments" && usage 1>&2 && exit 2
+[[ $# -gt "$FLAG_OPT_TOTAL" ]] && error "${SCRIPT_NAME}: Too many arguments" && usage 1>&2 && exit 2
 
 
   #===============#
   #== Main part ==#
   #===============#
-
-
-
-
-
+warning "testing"
   #===============#
   #===== End =====#
   #===============#
