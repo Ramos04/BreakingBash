@@ -6,24 +6,31 @@
 #+    ${SCRIPT_NAME} [-hv] [-o[file]] args ...
 #%
 #% DESCRIPTION
-#%    This a template for bash scripts
+#%    This is a bash template that is a modified version of the
+#%    template created by Michel VONGVILAY (https://www.uxora.com).
+#%
 #%
 #% OPTIONS
 #%    -h, --help                    Print this help
 #%    -V, --version                 Print script information
+#%    -d, --debug                   Print all commands to screen
 #%
 #% EXAMPLES
-#%    ${SCRIPT_NAME} -h -v
+#%    ${SCRIPT_NAME} -h -v -d
 #%
 #================================================================
 #- IMPLEMENTATION
-#-    version         ${SCRIPT_NAME} 0.0.1
+#-    author          Michel VONGVILAY (https://www.uxora.com)
 #-    author          Vincent Ramos (https://github.com/Ramos04)
+#-    version         ${SCRIPT_NAME} 0.0.1
 #-    license         N/A
 #-
 #================================================================
 #  HISTORY
-#     2019/08/13 : Ramos04 : Created Template
+#     2019/08/13 : Ramos04 : Forked template
+#     2019/08/27 : Ramos04 : Absolutely butchered template
+#     2019/09/09 : Ramos04 : Cleaned up old template
+#     2019/09/17 : Ramos04 : Added functions for printing errors
 # 
 #================================================================
 #  DEBUG OPTION
@@ -81,13 +88,38 @@ trap cleanup EXIT
   # |-- logging functions --|
   # +-----------------------+
 
+#= DESC: Uses the functions below to give output
+#= USE:
+#=    output error "Error Message"
+#=    output warning "Warning Message"
+#=    output success "Success Message"
+#=    output other "Other Message"
+output(){
+    local OUT_TYPE="$1"
+    local OUT_MESSAGE="$2"
+    case "${OUT_TYPE}" in
+        error)    error "$OUT_MESSAGE"
+        ;;
+        warning ) warning "$OUT_MESSAGE"
+        ;;
+        success ) success "$OUT_MESSAGE"
+        ;;
+        other ) other "$OUT_MESSAGE"
+        ;;
+    esac
+}
+
 #= DESC: Log error to stdout and "$LOG_MAIN"
 #= PARAM: error message to be printed
 error() {
     local ERR_MESSAGE="$1"
     local ERR_TIMESTAMP="$(date)"
-    echo ""$ERR_TIMESTAMP" "$SCRIPT_NAME" [ERR]: "$ERR_MESSAGE"" 2>&1 \
-        | tee -a "$LOG_MAIN"
+    echo ""$ERR_TIMESTAMP" "$SCRIPT_NAME" [ERR]: "$ERR_MESSAGE"" >> "$LOG_MAIN"
+
+    # If verbose flag is enabled
+    if [[ "$SCRIPT_VERBOSE" = true ]]; then
+        printf "${COL_RED}"$SCRIPT_NAME" [ERR]: "$ERR_MESSAGE"${COL_NORM}\n"
+    fi
 }
 
 #= DESC: Log warning to stdout and "$LOG_MAIN"
@@ -95,8 +127,12 @@ error() {
 warning() {
     local WARN_MESSAGE="$1"
     local WARN_TIMESTAMP="$(date)"
-    echo ""$WARN_TIMESTAMP" "$SCRIPT_NAME" [WARN]: "$WARN_MESSAGE"" 2>&1 \
-    | tee -a "$LOG_MAIN"
+    echo ""$WARN_TIMESTAMP" "$SCRIPT_NAME" [WAR]: "$WARN_MESSAGE"" >> "$LOG_MAIN"
+
+    # If verbose flag is enabled
+    if [[ "$SCRIPT_VERBOSE" = true ]]; then
+        printf "${COL_YELLOW}"$SCRIPT_NAME" [WAR]: "$WARN_MESSAGE"${COL_NORM}\n"
+    fi
 }
 
 #= DESC: Log success to stdout and "$LOG_MAIN"
@@ -104,8 +140,23 @@ warning() {
 success(){
     local SUC_MESSAGE="$1"
     local SUC_TIMESTAMP="$(date)"
-    echo ""$SUC_TIMESTAMP" "$SCRIPT_NAME" [SUC]: "$SUC_MESSAGE"" 2>&1 \
-    | tee -a "$LOG_MAIN"
+    echo ""$SUC_TIMESTAMP" "$SCRIPT_NAME" [SUC]: "$SUC_MESSAGE"" >> "$LOG_MAIN"
+
+    # If verbose flag is enabled
+    if [[ "$SCRIPT_VERBOSE" = true ]]; then
+        printf "${COL_GREEN}"$SCRIPT_NAME" [SUC]: "$SUC_MESSAGE"${COL_NORM}\n"
+    fi
+}
+
+other(){
+    local MES_MESSAGE="$1"
+    local MES_TIMESTAMP="$(date)"
+    echo ""$MES_TIMESTAMP" "$SCRIPT_NAME" [MES]: "$MES_MESSAGE"" >> "$LOG_MAIN"
+
+    # If verbose flag is enabled
+    if [[ "$SCRIPT_VERBOSE" = true ]]; then
+        printf ""$SCRIPT_NAME" [MES]: "$MES_MESSAGE"\n"
+    fi
 }
 
   # +---------------------+
@@ -154,6 +205,12 @@ readonly SCRIPT_EXEC_ID=${$}                             # Exec ID
 readonly SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
 
   # +--------------------+
+  # |-- flag variables --|
+  # +--------------------+
+FLAG_VERBOSE=false
+FLAG_DEBUG=false
+
+  # +--------------------+
   # |-- date variables --|
   # +--------------------+
 
@@ -185,14 +242,21 @@ readonly TEMP_FILE=$SCRIPT_DIR"/<name>.tmp"  # Change this to TEMP_FILE_<name>
   # +------------------+
 
 readonly COL_NORM=$'\e[0m'
+readonly COL_BLACK=$'\e[0;30m'
 readonly COL_RED=$'\e[0;31m'
 readonly COL_GREEN=$'\e[0;32m'
+readonly COL_YELLOW=$'\e[0;33m'
 readonly COL_BLUE=$'\e[0;34m'
-readonly COL_BLACK=$'\e[0;30m'
+readonly COL_PURPLE=$'\e[0;35m'
+readonly COL_CYAN=$'\e[0;36m'
+
+readonly COL_BOLD_BLACK=$'\e[1;30m'
 readonly COL_BOLD_RED=$'\e[1;31m'
 readonly COL_BOLD_GREEN=$'\e[1;32m'
+readonly COL_BOLD_YELLOW=$'\e[1;33m'
 readonly COL_BOLD_BLUE=$'\e[1;34m'
-readonly COL_BOLD_BLACK=$'\e[1;30m'
+readonly COL_BOLD_PURPLE=$'\e[1;35m'
+readonly COL_BOLD_CYAN=$'\e[1;36m'
 
   # +------------------------+
   # |-- function variables --|
@@ -208,15 +272,15 @@ readonly COL_BOLD_BLACK=$'\e[1;30m'
   # +----------------------+
 
 #= Gets set when an error occurs parsing flags
-FLAG_OPT_ERR=0
+OPT_ERR=0
 
 #= Change to reflect the number of options the program has
-FLAG_OPT_TOTAL=0
+OPT_TOTAL=0
 
 #= Options for the flags
-FLAG_OPTS=":hV-:"
+OPT_OPTS=":hV-:"
 
-while getopts "$FLAG_OPTS" OPTION; do
+while getopts "$OPT_OPTS" OPTION; do
     case "${OPTION}" in
         -)
             case "${OPTARG}" in
@@ -224,8 +288,12 @@ while getopts "$FLAG_OPTS" OPTION; do
                 ;;
                 version )  scriptinfo "ver"; exit 0;
                 ;;
+                verbose )  FLAG_VERBOSE=true;
+                ;;
+                debug )  FLAG_DEBUG=true;
+                ;;
                 *)  error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-                    FLAG_OPT_ERR=1
+                    OPT_ERR=1
                 ;;
             esac
         ;;
@@ -233,14 +301,18 @@ while getopts "$FLAG_OPTS" OPTION; do
         ;;
         V ) scriptinfo "ver"; exit 0;
         ;;
+        v )  FLAG_VERBOSE=true;
+        ;;
+        d )  FLAG_DEBUG=true;
+        ;;
         : ) echo "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-            FLAG_OPT_ERR=1; exit 1;
+            OPT_ERR=1; exit 1;
         ;;
         ? ) echo "${SCRIPT_NAME}: -$OPTARG: unknown option"
-            FLAG_OPT_ERR=1; exit 1;
+            OPT_ERR=1; exit 1;
         ;;
         *)  echo "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-            FLAG_OPT_ERR=1; exit 1;
+            OPT_ERR=1; exit 1;
         ;;
     esac
 done
@@ -263,13 +335,19 @@ shift $((${OPTIND} - 1)) ## shift options
 [[ $# -gt "$FLAG_OPT_TOTAL" ]] && echo "${SCRIPT_NAME}: Too many arguments" && \
     usage 1>&2 && exit 2
 
+#= DESC: Checks for debug flag
+if [[ "$FLAG_DEBUG" = true ]] && set -x
+
   #================#
   #====  main  ====#
   #================#
 
+
+
   #================#
   #====  end   ====#
   #================#
+
 
   #================#
   #====  post  ====#
