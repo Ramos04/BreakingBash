@@ -37,9 +37,10 @@
   # +---------------------+
   # |-- Script Breakers --|
   # +---------------------+
-# These make the script fail misserably at the slightest error. 
-# Makes it easier for debugging and finding errors. 
+#= DESC: Causes script to fail on unset variables, pipe errors, non 0 exit code
 set -euo pipefail
+
+#= Make bash arrays easier to work with
 IFS=$'\n\t'
 
 #============================
@@ -49,29 +50,9 @@ IFS=$'\n\t'
   # +----------------------+
   # |-- custom functions --|
   # +----------------------+
-# All user defined functions should be placed here
 
-
-#============================
-#  ALIAS AND FUNCTIONS
-#============================
-
-  # +--------------------+
-  # |-- script cleanup --|
-  # +--------------------+
-cleanup() {
-    # Check if there are temp files, if so clean up
-    if [[ ${#TEMP_FILES[@]} > 0 ]]; then
-        rm -f "${TEMP_FILES[@]}"
-    fi
-}
-trap cleanup EXIT
-
-
-  # +--------------------------------+
-  # |-- error management functions --|
-  # +--------------------------------+
-
+#= DESC: Checks if script is run as root
+#= EXIT: if EUID is not root
 sudocheck() {
     # Check if script is run as root
     if [ "$EUID" -ne 0 ]
@@ -80,6 +61,28 @@ sudocheck() {
     fi
 }
 
+ # All user defined functions should be placed here
+
+  # +----------------------------------+
+  # |-- startup and finish functions --|
+  # +----------------------------------+
+
+#= DESC: Cleanup temp files on exit
+cleanup() {
+    # Check if there are temp files, if so clean up
+    if [[ ${#TEMP_FILES[@]} > 0 ]]; then
+        rm -f "${TEMP_FILES[@]}"
+    fi
+}
+
+trap cleanup EXIT
+
+  # +-----------------------+
+  # |-- logging functions --|
+  # +-----------------------+
+
+#= DESC: Log error to stdout and "$LOG_MAIN"
+#= PARAM: error message to be printed
 error() {
     local ERR_MESSAGE="$1"
     local ERR_TIMESTAMP="$(date)"
@@ -87,6 +90,8 @@ error() {
         | tee -a "$LOG_MAIN"
 }
 
+#= DESC: Log warning to stdout and "$LOG_MAIN"
+#= PARAM: warning message to be printed
 warning() {
     local WARN_MESSAGE="$1"
     local WARN_TIMESTAMP="$(date)"
@@ -94,6 +99,8 @@ warning() {
     | tee -a "$LOG_MAIN"
 }
 
+#= DESC: Log success to stdout and "$LOG_MAIN"
+#= PARAM: success message to be printed
 success(){
     local SUC_MESSAGE="$1"
     local SUC_TIMESTAMP="$(date)"
@@ -101,22 +108,22 @@ success(){
     | tee -a "$LOG_MAIN"
 }
 
-  # +----------------------------------+
-  # |-- startup and finish functions --|
-  # +----------------------------------+
-
   # +---------------------+
   # |-- usage functions --|
   # +---------------------+
+
+#= DESC: Displays usage information
 usage() {
     printf "Usage: ";
     scriptinfo usg ;
 }
 
+#= DESC: Displays full usage information
 usagefull() {
     scriptinfo ful;
 }
 
+#= DESC: Displays script information
 scriptinfo() { headFilter="^#-";
     if [[ ! -z "$1" ]];then
         [[ "$1" = "usg" ]] && headFilter="^#+"
@@ -134,52 +141,58 @@ scriptinfo() { headFilter="^#-";
   # +-----------------------+
   # |-- general variables --|
   # +-----------------------+
-SCRIPT_VERSION="0.0.1"
-SCRIPT_NAME_EXT="$(basename ${0})"              # scriptname without path
-SCRIPT_NAME="${SCRIPT_NAME_EXT%.*}"             # scriptname without .sh
-SCRIPT_DIR="$( cd $(dirname "$0") && pwd )"     # Script Directory
-SCRIPT_ROOT="${SCRIPT_DIR%/*}"	                # Add a /* depending on script depth
-SCRIPT_FULLPATH="${SCRIPT_DIR}/${SCRIPT_NAME}"  # Full path of the script
-SCRIPT_HOSTNAME="$(hostname)"                   # Hostname
-SCRIPT_COMMAND_FULL="${0} $*"                   # Full command
-SCRIPT_EXEC_ID=${$}                             # Exec ID
-SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
+
+readonly SCRIPT_VERSION="0.0.1"
+readonly SCRIPT_NAME_EXT="$(basename ${0})"              # scriptname without path
+readonly SCRIPT_NAME="${SCRIPT_NAME_EXT%.*}"             # scriptname without .sh
+readonly SCRIPT_DIR="$( cd $(dirname "$0") && pwd )"     # Script Directory
+readonly SCRIPT_ROOT="${SCRIPT_DIR%/*}"	                # Add a /* depending on script depth
+readonly SCRIPT_FULLPATH="${SCRIPT_DIR}/${SCRIPT_NAME}"  # Full path of the script
+readonly SCRIPT_HOSTNAME="$(hostname)"                   # Hostname
+readonly SCRIPT_COMMAND_FULL="${0} $*"                   # Full command
+readonly SCRIPT_EXEC_ID=${$}                             # Exec ID
+readonly SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
 
   # +--------------------+
   # |-- date variables --|
   # +--------------------+
-DATE_FORMAT="+%Y%m%d"
-DATE_SCRIPT_EXEC=$(date ${DATE_FORMAT})
-DATE_LOG_TIMESTAMP="$(date)"
+
+readonly DATE_FORMAT="+%Y%m%d"
+readonly DATE_SCRIPT_EXEC=$(date ${DATE_FORMAT})
+readonly DATE_LOG_TIMESTAMP="$(date)"
 
   # +--------------------+
   # |-- file variables --|
   # +--------------------+
-LOG_MAIN="$(pwd)/"$SCRIPT_NAME".log"
-LOG_ERR="$(pwd)/error.log"
+
+readonly LOG_MAIN="$(pwd)/"$SCRIPT_NAME".log"
+readonly LOG_ERR="$(pwd)/error.log"
 
   # +----------------+
   # |-- temp files --|
   # +----------------+
-TEMP_FILES=()                       # Need to add all temp dir/file paths to this
-                                    # Exit trap uses this to clean on scrip exit
-TEMP_DIR=$SCRIPT_DIR"/tmp"          # Change this to TEMP_FILE_<name> for as many
-                                    # temp dirs are needed
-TEMP_FILE=$SCRIPT_DIR"/<name>.tmp"  # Change this to TEMP_FILE_<name> for as many
-                                    # temp files are needed
+
+TEMP_FILES=()                                # Need to add all temp dir/file paths
+                                             # to this. Exit trap uses this to
+                                             # clean on scrip exit
+readonly TEMP_DIR=$SCRIPT_DIR"/tmp"          # Change this to TEMP_FILE_<name>
+                                             # for as manytemp dirs are needed
+readonly TEMP_FILE=$SCRIPT_DIR"/<name>.tmp"  # Change this to TEMP_FILE_<name>
+                                             # for as many temp files are needed
 
   # +------------------+
   # |-- color output --|
   # +------------------+
-COL_NORM=$'\e[0m'
-COL_RED=$'\e[0;31m'
-COL_GREEN=$'\e[0;32m'
-COL_BLUE=$'\e[0;34m'
-COL_BLACK=$'\e[0;30m'
-COL_BOLD_RED=$'\e[1;31m'
-COL_BOLD_GREEN=$'\e[1;32m'
-COL_BOLD_BLUE=$'\e[1;34m'
-COL_BOLD_BLACK=$'\e[1;30m'
+
+readonly COL_NORM=$'\e[0m'
+readonly COL_RED=$'\e[0;31m'
+readonly COL_GREEN=$'\e[0;32m'
+readonly COL_BLUE=$'\e[0;34m'
+readonly COL_BLACK=$'\e[0;30m'
+readonly COL_BOLD_RED=$'\e[1;31m'
+readonly COL_BOLD_GREEN=$'\e[1;32m'
+readonly COL_BOLD_BLUE=$'\e[1;34m'
+readonly COL_BOLD_BLACK=$'\e[1;30m'
 
   # +------------------------+
   # |-- function variables --|
@@ -193,13 +206,15 @@ COL_BOLD_BLACK=$'\e[1;30m'
   # +----------------------+
   # |-- option variables --|
   # +----------------------+
-FLAG_OPT_ERR=0
-# Change this to reflect the number of options the program has
-FLAG_OPT_TOTAL=0
-# FLAG_ options
-FLAG_OPTS=":hV-:"
 
-#Need to fix this shit
+#= Gets set when an error occurs parsing flags
+FLAG_OPT_ERR=0
+
+#= Change to reflect the number of options the program has
+FLAG_OPT_TOTAL=0
+
+#= Options for the flags
+FLAG_OPTS=":hV-:"
 
 while getopts "$FLAG_OPTS" OPTION; do
     case "${OPTION}" in
@@ -231,25 +246,31 @@ while getopts "$FLAG_OPTS" OPTION; do
 done
 shift $((${OPTIND} - 1)) ## shift options
 
-
-
 #============================
 #  MAIN SCRIPT
 #============================
 
-  #== Check for FLAG_ argument erros ==#
+  #================#
+  #== pre-script ==#
+  #================#
+
+#= DESC: Check $FLAG_OPT_ERR for argument erros
+#= EXIT: On $FLAG_OPT_ERR flag being set
 [[ $FLAG_OPT_ERR -eq 1 ]] && usage 1>&2 && exit 1
 
-  #== Check/Set arguments ==#
+#= DESC: Checks for correct number of arguments
+#= EXIT: On too many arguments being passed in
 [[ $# -gt "$FLAG_OPT_TOTAL" ]] && echo "${SCRIPT_NAME}: Too many arguments" && \
     usage 1>&2 && exit 2
 
+  #================#
+  #====  main  ====#
+  #================#
 
-  #===============#
-  #== Main part ==#
-  #===============#
+  #================#
+  #====  end   ====#
+  #================#
 
-
-  #===============#
-  #===== End =====#
-  #===============#
+  #================#
+  #====  post  ====#
+  #================#
