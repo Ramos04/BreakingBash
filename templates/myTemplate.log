@@ -1,0 +1,4 @@
+Tue Sep 17 13:19:32 DST 2019 myTemplate [WARN]: testing
+Tue Sep 17 13:21:02 DST 2019 myTemplate [ERR]: myTemplate: -x: unknown option
+Tue Sep 17 13:22:23 DST 2019 myTemplate [WARN]: testing
+Tue Sep 17 13:22:31 DST 2019 myTemplate [ERR]: myTemplate: -x: unknown option

@@ -6,21 +6,14 @@
 #+    ${SCRIPT_NAME} [-hv] [-o[file]] args ...
 #%
 #% DESCRIPTION
-#%    This script is used to set up a full blown elk stack with
-#%    to start any good shell script.
-#%
-#% INSTALLED
-#%    elasticsearch
-#%    logstash
-#%    kibana
-#%    nginx
+#%    This a template for bash scripts
 #%
 #% OPTIONS
 #%    -h, --help                    Print this help
-#%    -v, --version                 Print script information
+#%    -V, --version                 Print script information
 #%
 #% EXAMPLES
-#%    ${SCRIPT_NAME}
+#%    ${SCRIPT_NAME} -h -v
 #%
 #================================================================
 #- IMPLEMENTATION
@@ -66,7 +59,6 @@ IFS=$'\n\t'
   # +--------------------+
   # |-- script cleanup --|
   # +--------------------+
-TEMP_FILES=( )
 cleanup() {
     # Check if there are temp files, if so clean up
     if [[ ${#TEMP_FILES[@]} > 0 ]]; then
@@ -92,21 +84,21 @@ error() {
     local ERR_MESSAGE="$1"
     local ERR_TIMESTAMP="$(date)"
     echo ""$ERR_TIMESTAMP" "$SCRIPT_NAME" [ERR]: "$ERR_MESSAGE"" 2>&1 \
-        | tee -a "$FILE_LOG"
+        | tee -a "$LOG_MAIN"
 }
 
 warning() {
     local WARN_MESSAGE="$1"
     local WARN_TIMESTAMP="$(date)"
     echo ""$WARN_TIMESTAMP" "$SCRIPT_NAME" [WARN]: "$WARN_MESSAGE"" 2>&1 \
-    | tee -a "$FILE_LOG"
+    | tee -a "$LOG_MAIN"
 }
 
 success(){
     local SUC_MESSAGE="$1"
     local SUC_TIMESTAMP="$(date)"
     echo ""$SUC_TIMESTAMP" "$SCRIPT_NAME" [SUC]: "$SUC_MESSAGE"" 2>&1 \
-    | tee -a "$FILE_LOG"
+    | tee -a "$LOG_MAIN"
 }
 
   # +----------------------------------+
@@ -143,16 +135,15 @@ scriptinfo() { headFilter="^#-";
   # |-- general variables --|
   # +-----------------------+
 SCRIPT_VERSION="0.0.1"
-SCRIPT_NAME_EXT="$(basename ${0})"                  # scriptname without path
-SCRIPT_NAME="${SCRIPT_NAME_EXT%.*}"                # scriptname without .sh
+SCRIPT_NAME_EXT="$(basename ${0})"              # scriptname without path
+SCRIPT_NAME="${SCRIPT_NAME_EXT%.*}"             # scriptname without .sh
 SCRIPT_DIR="$( cd $(dirname "$0") && pwd )"     # Script Directory
-SCRIPT_ROOT="${SCRIPT_DIR%/*}"	                # Add a /* depending on depth of
-                                                # the script folder in the root.
-SCRIPT_TEMP_DIR=$SCRIPT_DIR"/tmp"               # Where to create temp folder
-SCRIPT_TEMP_DIR=$SCRIPT_DIR"/<name>.tmp"        # Need to insert filename in this one
+SCRIPT_ROOT="${SCRIPT_DIR%/*}"	                # Add a /* depending on script depth
 SCRIPT_FULLPATH="${SCRIPT_DIR}/${SCRIPT_NAME}"  # Full path of the script
-HOSTNAME="$(hostname)"                          # Hostname
-FULL_COMMAND="${0} $*"                          # Full command
+SCRIPT_HOSTNAME="$(hostname)"                   # Hostname
+SCRIPT_COMMAND_FULL="${0} $*"                   # Full command
+SCRIPT_EXEC_ID=${$}                             # Exec ID
+SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
 
   # +--------------------+
   # |-- date variables --|
@@ -161,30 +152,30 @@ DATE_FORMAT="+%Y%m%d"
 DATE_SCRIPT_EXEC=$(date ${DATE_FORMAT})
 DATE_LOG_TIMESTAMP="$(date)"
 
-  # +---------------------------+
-  # |-- information variables --|
-  # +---------------------------+
-
-EXEC_ID=${$}
-SCRIPT_HEADSIZE=$(grep -sn "^# END_OF_HEADER" ${0} | head -1 | cut -f1 -d:)
-
   # +--------------------+
   # |-- file variables --|
   # +--------------------+
-FILE_LOG="$(pwd)/"$SCRIPT_NAME".log"
-ERR_LOG="$(pwd)/error.log"
+LOG_MAIN="$(pwd)/"$SCRIPT_NAME".log"
+LOG_ERR="$(pwd)/error.log"
+
+  # +----------------+
+  # |-- temp files --|
+  # +----------------+
+TEMP_FILES=()                       # Need to add all temp dir/file paths to this
+                                    # Exit trap uses this to clean on scrip exit
+TEMP_DIR=$SCRIPT_DIR"/tmp"          # Change this to TEMP_FILE_<name> for as many
+                                    # temp dirs are needed
+TEMP_FILE=$SCRIPT_DIR"/<name>.tmp"  # Change this to TEMP_FILE_<name> for as many
+                                    # temp files are needed
 
   # +------------------+
   # |-- color output --|
   # +------------------+
-# color output
 COL_NORM=$'\e[0m'
 COL_RED=$'\e[0;31m'
 COL_GREEN=$'\e[0;32m'
 COL_BLUE=$'\e[0;34m'
 COL_BLACK=$'\e[0;30m'
-
-# bold
 COL_BOLD_RED=$'\e[1;31m'
 COL_BOLD_GREEN=$'\e[1;32m'
 COL_BOLD_BLUE=$'\e[1;34m'
@@ -206,7 +197,7 @@ FLAG_OPT_ERR=0
 # Change this to reflect the number of options the program has
 FLAG_OPT_TOTAL=0
 # FLAG_ options
-FLAG_OPTS=":hv-:"
+FLAG_OPTS=":hV-:"
 
 #Need to fix this shit
 
@@ -214,36 +205,27 @@ while getopts "$FLAG_OPTS" OPTION; do
     case "${OPTION}" in
         -)
             case "${OPTARG}" in
-                help )  usagefull
-	    	        exit 0
+                help )     usagefull; exit 0;
                 ;;
-                version )  scriptinfo "ver"
-	    		   exit 0
+                version )  scriptinfo "ver"; exit 0;
                 ;;
                 *)  error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-	    	    FLAG_OPT_ERR=1
+                    FLAG_OPT_ERR=1
                 ;;
             esac
-	    ;;
-
-	h ) usagefull
-	    exit 0
-	;;
-
-	v ) scriptinfo "ver"
-	    exit 0
-	;;
-
-	: ) error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-	    FLAG_OPT_ERR=1
-	;;
-
-	? ) error "${SCRIPT_NAME}: -$OPTARG: unknown option"
-	    FLAG_OPT_ERR=1
-	;;
-
-        *)  error "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
-            FLAG_OPT_ERR=1
+        ;;
+        h ) usagefull; exit 0;
+        ;;
+        V ) scriptinfo "ver"; exit 0;
+        ;;
+        : ) echo "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
+            FLAG_OPT_ERR=1; exit 1;
+        ;;
+        ? ) echo "${SCRIPT_NAME}: -$OPTARG: unknown option"
+            FLAG_OPT_ERR=1; exit 1;
+        ;;
+        *)  echo "${SCRIPT_NAME}: -$OPTARG: option requires an argument"
+            FLAG_OPT_ERR=1; exit 1;
         ;;
     esac
 done
@@ -256,16 +238,18 @@ shift $((${OPTIND} - 1)) ## shift options
 #============================
 
   #== Check for FLAG_ argument erros ==#
-[ $FLAG_OPT_ERR -eq 1 ] && exit 1 ## print usage if option error and exit
+[[ $FLAG_OPT_ERR -eq 1 ]] && usage 1>&2 && exit 1
 
   #== Check/Set arguments ==#
-[[ $# -gt "$FLAG_OPT_TOTAL" ]] && error "${SCRIPT_NAME}: Too many arguments" && usage 1>&2 && exit 2
+[[ $# -gt "$FLAG_OPT_TOTAL" ]] && echo "${SCRIPT_NAME}: Too many arguments" && \
+    usage 1>&2 && exit 2
 
 
   #===============#
   #== Main part ==#
   #===============#
-warning "testing"
+
+
   #===============#
   #===== End =====#
   #===============#
