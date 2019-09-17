@@ -222,7 +222,7 @@ readonly DATE_LOG_TIMESTAMP="$(date)"
   # |-- file variables --|
   # +--------------------+
 
-readonly LOG_MAIN="$(pwd)/"$SCRIPT_NAME".log"
+readonly LOG_MAIN="$(pwd)/output.log"
 readonly LOG_ERR="$(pwd)/error.log"
 
   # +----------------+
